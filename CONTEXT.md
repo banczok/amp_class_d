@@ -66,24 +66,149 @@ else caches authoritative state.
 
 ## Status
 
-| Tree | State |
+### Done
+
+All four trees below are written and verified as far as they can be
+without hardware. Nothing has been flashed or linked.
+
+**`firmware/pico/` — RP2350 controller. Complete.**
+
+| | |
 | --- | --- |
-| `pico/` | **Complete.** All 18 sources + a host DSP test. |
-| `esp32c3/` | **Complete.** |
-| `knob/` | **Complete.** |
-| `pi/` | Core done: proto, link, audio, eq, fingerprint, sources, config, service, visualizers. |
+| `main.c` | init order, core 1 launch, main loop, one dispatcher for every source of user intent |
+| `power.c` | on/off sequencing, low-power standby at 12 MHz in WFI |
+| `audio.c` | audio state; enforces the PGA ceiling and the EQ-boost clamp |
+| `pga2320.c` `bd37033.c` | volume over SPI, three-band tone over I²C |
+| `relays.c` | mains, secondary, input select, EQ bypass |
+| `encoder.c` | quadrature, click, long press; owns the GPIO callback |
+| `irrx.c` | NEC / NEC-ext / RC5 / RC5X / SIRC 12-15-20, all learned |
+| `settings.c` | wear-levelled flash config, two slots, CRC32 + sequence |
+| `menu.c` | settings menu state machine, rendered on the Pi's panel |
+| `meter.c` `fft.c` | stereo metering, two Q15 transforms per block on core 1, plus the decimated audio stream |
+| `linkpi.c` `linkesp.c` | the two UART links |
+| `test/dsptest.c` | host check of the μ-law codec and the decimation filter |
 
-**Not written yet, in order:**
+**`firmware/esp32c3/` — ESP-NOW endpoint. Complete.** Radio, UART bridge
+to the Pico, cached state, the wake-preamble handshake.
 
-1. `pi/ampd/api.py` — REST + WebSocket (FastAPI)
-2. `pi/web/panel/` — the 1920×480 kiosk page and the **15 visualiser
-   modules** (`vis/<id>.js`, one per mode in `visualizers.py`)
-3. `pi/web/ui/` — settings web UI: 7-band EQ with target-vs-achieved
-   curves, visualiser enable/reorder, config
-4. Cover art enrichment — Shazam does not always return a URL and the
-   knob needs exactly 480×480. iTunes Search and Cover Art Archive are
-   both free and keyless; Last.fm's art is unreliable now.
-5. `systemd/ampd.service` and an install script
+**`firmware/knob/` — battery knob. Complete.** ST7701S panel bring-up,
+LVGL UI with five screens, deep sleep on GPIO0, ESP-NOW link with
+keepalive and a link indicator, battery gauge, cover fetch over HTTP.
+
+**`firmware/pi/ampd/` — the Pi service. Core complete.**
+
+| | |
+| --- | --- |
+| `proto.py` | the wire format, cross-checked against the C header |
+| `link.py` | async UART, reconnects forever, never blocks |
+| `audio.py` | μ-law ring, per-channel spectra, fingerprint captures |
+| `eq.py` | seven sliders → BD37033 settings, ~2 ms a solve |
+| `fingerprint.py` | providers, track watcher, match cache |
+| `sources.py` | MPD, LinkPlay/WiiM, fingerprint, in priority order |
+| `visualizers.py` | the mode manifest the web UI edits |
+| `config.py` | settings, one JSON file we own |
+| `service.py` | the loop, and the three policies |
+
+Five test suites, all passing, each printing what it measured:
+
+```
+tests/test_proto.py        ids and framing against firmware/common/proto.h
+tests/test_audio.py        ring, interleave, band mapping, resampler aliasing
+tests/test_eq.py           fit quality per preset, slider authority, timing
+tests/test_fingerprint.py  lookups per track, volume immunity, cache keys
+tests/test_service.py      when the audio stream and fingerprinter run
+```
+
+### Next, in order
+
+**1. `pi/ampd/api.py` — REST + WebSocket (FastAPI).**
+
+Nothing else can be built until this exists; the panel and the web UI are
+both clients of it. Suggested surface, which `service.py` already has the
+state for:
+
+```
+GET  /api/state                     State.to_json()
+POST /api/power        {on}
+POST /api/volume       {db} | {rel}
+POST /api/mute         {on|toggle}
+POST /api/input        {0|1}
+POST /api/eq           {sliders:[7]}  -> {solution, target[], achieved[]}
+GET  /api/visualizers                  Registry.to_json()
+PUT  /api/visualizers/{id}  {enabled}
+PUT  /api/visualizers/order {ids:[]}
+GET  /api/config  /  PUT /api/config
+POST /api/menu/key     {key}           1=up 2=down 3=ok 4=back
+GET  /cover.jpg?id=N                   480x480 for the knob, 400x400 panel
+WS   /ws                               state + meter frames, ~47 Hz
+```
+
+Subscribe with `service.subscribe()`; it already coalesces and drops for
+a slow client rather than blocking.
+
+**2. `pi/web/panel/` — the 1920×480 kiosk page.**
+
+Now playing on the **left 640**, visualiser on the **right 1280**. Swipe
+the visualiser area to change mode, long-press for the picker. Transport
+buttons only on the digital input — on analogue there is nothing to
+control.
+
+Fifteen modules in `vis/`, one per id in `visualizers.py`:
+`vu vudial ppm peakbars bars mirror led dots dualarea stereoblend scope
+fillwave mesh gonio particles` (plus `blank`). Every one is stereo.
+
+A module exports one object:
+
+```js
+export default {
+  id: "bars",
+  needs: ["bands"],              // must match visualizers.py
+  init(ctx, w, h) {},            // called on mode change and resize
+  render(ctx, frame) {},         // frame = { bandL[32], bandR[32],
+                                 //   peakL, peakR, rmsL, rmsR,
+                                 //   waveL[], waveR[], edgesHz[] }
+  destroy() {}
+};
+```
+
+Band bytes are 0..255 at **2.657 units per dB with 0 dBFS at 208** — the
+same scale on both feeds, so a module never has to ask which one it is
+drawing. `edgesHz` travels with the data; do not assume a range.
+
+**3. `pi/web/ui/` — the settings web UI.**
+
+Seven-band EQ drawing **target and achieved together** — without both the
+sliders lie. Mark the 160 Hz and 400 Hz sliders as low authority (~60%);
+they sit in the gap between the bass band's 120 Hz ceiling and the mid
+band's 500 Hz floor. Also: visualiser enable and reorder, input naming,
+config fields, and the link/provider diagnostics from `link.stats()`.
+
+**4. Cover art enrichment.** Shazam does not always return a URL, and the
+knob wants exactly 480×480 or it refuses the JPEG. iTunes Search and the
+Cover Art Archive are both free and keyless; Last.fm's artwork is
+unreliable now (placeholder images). The Pi resizes — the knob will not.
+
+**5. `systemd/ampd.service` and an install script.** Its own unit, its own
+directory, touching nothing of moOde's so an update cannot fight it.
+
+### Then, when hardware exists
+
+- Flash and check the power sequencing against a scope before connecting
+  the amplifier
+- Confirm the encoder's resting contact state before enabling
+  `WAKE_ON_ROTATION` on the knob — see its README
+- Measure the knob's deep-sleep current with the battery divider fitted
+- Pick the Pi 4's serial overlay and confirm 921600 is clean
+
+### Optional, considered and deliberately not built
+
+- **YAMNet** as a content gate — it classifies audio *events*, so it
+  cannot identify a track, but it would stop a title being offered while
+  a radio presenter is talking. ~100 ms an inference on a Pi 4.
+- **Last.fm scrobbling**, including scrobbling vinyl the fingerprinter
+  identified. Last.fm cannot identify audio, but it can receive a scrobble.
+- A **local library index** so the analogue input matches your own
+  collection offline, with no service at all.
 
 ## Resuming on another machine
 
