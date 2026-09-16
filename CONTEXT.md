@@ -85,6 +85,25 @@ else caches authoritative state.
    both free and keyless; Last.fm's art is unreliable now.
 5. `systemd/ampd.service` and an install script
 
+## Resuming on another machine
+
+```bash
+git clone git@github.com:banczok/amp_class_d.git
+cd amp_class_d
+claude
+```
+
+`CLAUDE.md` is loaded automatically and imports this file, so a fresh
+session starts with the project context already in front of it. Nothing
+else needs installing to run the Python tests.
+
+Working across two machines, the only real hazard is the KiCad files:
+they are text, but a three-way merge of a `.kicad_pcb` produces a board
+that opens and is silently wrong. `.gitattributes` marks them
+`merge=binary` so git refuses rather than guesses. In practice: **pull
+before you open KiCad, commit before you stop**, and never edit the board
+on two machines without pushing in between.
+
 ## Building and testing
 
 Nothing here needs hardware.
@@ -187,9 +206,12 @@ Not regressions; the user is aware of each.
 - Silkscreen text below the fab minimum
 - Stale value fields: K2 says `PR30-12V` while `PR30-5V` is ordered;
   K3 / U12 / A1 / U9 likewise
-- `ai_amp.kicad_pcb` is a scratch placement copy with a known defect
-  (footprint rotations set without updating pad absolute angles). Ignore
-  it; `amp_ctrl.kicad_pcb` is the real board.
+
+`amp_ctrl/amp_ctrl.kicad_pcb` is the board, and the only one. An earlier
+scratch copy was edited as text and ended up internally inconsistent -
+footprint rotations changed without the pad angles that must follow them,
+because KiCad stores pad angles absolutely - which showed up as about 93
+phantom shorts in DRC. It has been deleted. Edit KiCad files in KiCad.
 
 ## Hardware setup notes
 
