@@ -1,0 +1,41 @@
+menu "Preamp controller (ESP32-C3)"
+
+config AMP_WIFI_SSID
+    string "Home WiFi SSID"
+    default ""
+    help
+        The C3 associates with this network so ESP-NOW runs on the same
+        channel the knob will use for album art.  Leave empty to run
+        ESP-NOW only, on AMP_ESPNOW_CHANNEL.
+
+config AMP_WIFI_PASS
+    string "Home WiFi password"
+    default ""
+
+config AMP_ESPNOW_CHANNEL
+    int "Fallback ESP-NOW channel"
+    range 1 13
+    default 1
+    help
+        Used when no SSID is configured, or before association
+        completes.  The knob must fall back to the same number.
+
+config AMP_ESPNOW_ENCRYPT
+    bool "Encrypt ESP-NOW unicast"
+    default n
+    help
+        Enables ESP-NOW LMK/PMK encryption on the knob link.  Both ends
+        must be built with the same keys.  Broadcast discovery frames are
+        never encrypted, so pairing still works either way.
+
+config AMP_ESPNOW_PMK
+    string "ESP-NOW primary master key (16 chars)"
+    depends on AMP_ESPNOW_ENCRYPT
+    default "amp-ctrl-pmk-001"
+
+config AMP_ESPNOW_LMK
+    string "ESP-NOW local master key (16 chars)"
+    depends on AMP_ESPNOW_ENCRYPT
+    default "amp-ctrl-lmk-001"
+
+endmenu

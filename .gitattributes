@@ -1,0 +1,15 @@
+# Normalise line endings in the repo so moving between this Windows box
+# and a Linux machine does not show every file as modified.
+* text=auto eol=lf
+
+# KiCad files are text but must never be merged automatically - a
+# three-way merge of a .kicad_pcb produces a board that opens and is
+# wrong, which is worse than a conflict.
+*.kicad_sch  text eol=lf merge=binary
+*.kicad_pcb  text eol=lf merge=binary
+*.kicad_pro  text eol=lf merge=binary
+*.net        text eol=lf
+
+*.png binary
+*.zip binary
+*.pdf binary

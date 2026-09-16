@@ -1,0 +1,32 @@
+menu "Preamp knob remote"
+
+config KNOB_WIFI_SSID
+    string "Home WiFi SSID"
+    default ""
+    help
+        Used only to fetch the album cover.  Control runs over ESP-NOW
+        and works with this left empty - you just get no artwork.
+
+config KNOB_WIFI_PASS
+    string "Home WiFi password"
+    default ""
+
+config KNOB_FALLBACK_CHANNEL
+    int "Fallback ESP-NOW channel"
+    range 1 13
+    default 1
+    help
+        Used on the very first wake, before the knob has ever
+        associated and cached the real channel.  Must match
+        AMP_ESPNOW_CHANNEL on the amplifier's C3.
+
+config KNOB_PI_BASE_URL
+    string "Base URL for the cover endpoint on the Pi"
+    default "http://moode.local/amp"
+    help
+        The knob GETs <base>/cover.jpg?id=N and expects a 480x480
+        baseline JPEG.  Scaling happens on the Pi: it has the CPU, and
+        an arbitrary-size cover would need a second full-screen buffer
+        plus a resampler on this chip.
+
+endmenu

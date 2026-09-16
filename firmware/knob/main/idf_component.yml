@@ -1,0 +1,16 @@
+dependencies:
+  idf:
+    # 5.2 for ADC_ATTEN_DB_12 (ADC_ATTEN_DB_11 is the deprecated
+    # spelling of the same setting on older releases).
+    version: ">=5.2"
+
+  # LVGL 8.x rather than 9: esp_lvgl_port 1.x targets it, and the RGB
+  # bounce-buffer / tear-avoidance path is well trodden there.
+  lvgl/lvgl: "~8.4.0"
+  espressif/esp_lvgl_port: "^1.4.0"
+
+  # CST816-class capacitive touch on I2C.
+  espressif/esp_lcd_touch_cst816s: "^1.0.6"
+
+  # Baseline JPEG decode for the album cover, straight to RGB565.
+  espressif/esp_new_jpeg: "^0.6.0"

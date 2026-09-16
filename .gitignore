@@ -1,0 +1,47 @@
+# --- KiCad -------------------------------------------------------------
+# Local UI state, not project content.
+*.kicad_prl
+fp-info-cache
+
+# KiCad writes these on every save and they are most of the repo size.
+*-backups/
+*.bak-*
+*.kicad_pcb-bak
+*.kicad_sch-bak
+_autosave-*
+*.lck
+
+# Fabrication output is generated from the board, not source.
+gbrs/
+*.zip
+
+# --- firmware builds ---------------------------------------------------
+build/
+managed_components/
+sdkconfig
+sdkconfig.old
+dependencies.lock
+*.uf2
+*.elf
+*.bin
+*.hex
+*.map
+
+# --- python ------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# ampd runtime state, written on the Pi
+firmware/pi/**/visualizers.json
+firmware/pi/**/matches.json
+firmware/pi/**/config.json
+
+# --- editors / os ------------------------------------------------------
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+*.swp
